@@ -1,7 +1,12 @@
 {
   "index": "Introduction",
-  "another": "Another Page",
-  "advanced": "Advanced (A Folder)",
+  "fundamentals": {
+    "title": "Fundamentals"
+  },
+  "create-update": "Create Update",
+  "scheduling-tasks": "Scheduling Tasks",
+  "phase-of-commit": "Phase of Commit",
+  "features": "Features",
   "about": {
     "title": "About",
     "type": "page"
@@ -9,7 +14,7 @@
   "contact": {
     "title": "Contact ↗",
     "type": "page",
-    "href": "https://twitter.com/shuding_",
+    "href": "https://twitter.com/zmzlois",
     "newWindow": true
   }
 }
