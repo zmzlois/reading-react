@@ -11,7 +11,7 @@ const config: DocsThemeConfig = {
   },
   docsRepositoryBase: 'https://github.com/zmzlois/reading-react',
   footer: {
-    text: 'Reading React - zmzlois, translated from https://react-book-new.vercel.app/',
+    text: <div>Reading React - zmzlois <br/> <p className="text-xs">Translated from <a href="https://react-book-new.vercel.app/">Analysing React Source Code</a></p></div>,
   },
 }
 

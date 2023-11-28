@@ -1,1 +1,224 @@
 # React API
+
+> Although we'd like to refer to `React` as a frontend framework, in reality, most of people don't know what's `React`. In fact, since Facebook separate the package of `React` and `ReactDOM`, `React` became much more than just a frontend framework. If you check the source code of `react` and `react-dom` after version 15, you will see that the core of `react` only includes about 1000+ lines of code(as I am translating this at the end of 2023, it has over 2000+ lines, [check here](https://github.com/facebook/react/tree/main/packages/react)), but [`react-dom`](https://github.com/facebook/react/tree/main/packages/react-dom) has over 20k lines. 
+<h/>
+Yep, you are not misreading. The major logics and frameworks are included in `react-dom`. Then what exactly is `react`?
+<br/>
+<sub>Note: </sub>
+<h/>
+<sub>`React` : the library provides a set of APIs to create and manage `React` elements. </sub>
+<br/> 
+<sub>`ReactDOM`: the package provides APIs to render `React` elements into DOM.</sub>
+<h/>
+Although the majority of APIs haven't changed, but a lot of improvement and capabilities are added. This is also the first time `Fiber` being introduced. Most of the latest changes are centered, or built on top of `Fiber`, such as `AsyncMode`, `Profiler` etc.
+
+I won't be discussing how do they achieve _abc_ prior to version 16. 1. Aiming at the future; 2. I have not read them.
+
+Let's look at the APIs they expose in `React` package:
+
+
+```typescript
+const React = {
+  Children: {
+    map,
+    forEach,
+    count,
+    toArray,
+    only,
+  },
+
+  createRef,
+  Component,
+  PureComponent,
+
+  createContext,
+  forwardRef,
+
+  Fragment: REACT_FRAGMENT_TYPE,
+  StrictMode: REACT_STRICT_MODE_TYPE,
+  unstable_AsyncMode: REACT_ASYNC_MODE_TYPE,
+  unstable_Profiler: REACT_PROFILER_TYPE,
+
+  createElement: __DEV__ ? createElementWithValidation : createElement,
+  cloneElement: __DEV__ ? cloneElementWithValidation : cloneElement,
+  createFactory: __DEV__ ? createFactoryWithValidation : createFactory,
+  isValidElement: isValidElement,
+
+  version: ReactVersion,
+
+  __SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED: ReactSharedInternals,
+};
+```
+Please ignore this `__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED` for now 😂
+
+## Children
+
+`children` targets the action to handle `props.children` because the data structure of `children` is similar to array but THEY ARE NOT ARRAY. If you want to handle `children` you can pass them in as props or component.
+
+## createRef
+
+Introduced two new ways of handling `ref`. React is cancelling `string ref` type of method like `<div ref="myDiv">`, in the future you will only be able to handle `ref` in two ways:
+(translator note: I have not seen anything written in this way for a long time, especially in Next.js)
+```typescript
+class App extends React.Component{
+
+  constructor() {
+    this.ref = React.createRef()
+  }
+
+  render() {
+    return <div ref={this.ref} />
+    // or
+    return <div ref={(node) => this.funRef = node} />
+  }
+
+}
+
+```
+
+## Component & PureComponent
+
+The only difference between these two is the the extra label on `PureComponent`: 
+
+```typescript
+if (ctor.prototype && ctor.prototype.isPureReactComponent) {
+  return (
+    !shallowEqual(oldProps, newProps) || !shallowEqual(oldState, newState)
+  );
+}
+```
+This is how React judge if a component needs to be updated. `ctor` is where they declare whether a component is inherited from `Component or PureComponent`. It will first check if this is a `PureComponent`, if it is, it will check if `props` and `state` are shallow equal. If they are, it will not update. If it is not a `PureComponent`, it will always update.
+
+The code of `shallowEqual` is as below:
+
+```typescript
+function shallowEqual(objA: mixed, objB: mixed): boolean {
+  if (is(objA, objB)) {
+    return true;
+  }
+
+  if (
+    typeof objA !== 'object' ||
+    objA === null ||
+    typeof objB !== 'object' ||
+    objB === null
+  ) {
+    return false;
+  }
+
+  const keysA = Object.keys(objA);
+  const keysB = Object.keys(objB);
+
+  if (keysA.length !== keysB.length) {
+    return false;
+  }
+
+  // Test for A's keys different from B.
+  for (let i = 0; i < keysA.length; i++) {
+    const currentKey = keysA[i];
+    if (
+      !hasOwnProperty.call(objB, currentKey) ||
+      // $FlowFixMe[incompatible-use] lost refinement of `objB`
+      !is(objA[currentKey], objB[currentKey])
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+export default shallowEqual;
+```
+
+It checks the type, object's key's length, if you are not sure why is there `Object.keys` in components, [this article](https://pomb.us/build-your-own-react/) will help you understand.
+
+> There are only two ways in `React` to know if a `ClassComponent` needs to be updated(as of React 16). One is `shouldComponentUpdate`, the other is shown above in `PureComponent`.
+
+## createContext
+
+`createContext` is newly introduced stable API to handle `context`. Before React 16, React team has never recommended using `context` because it wasn't stable. React team has also confirmed that they will remove the old `API`.
+
+How to use the new API: 
+
+```typescript
+const { Provider, Consumer } = React.createContext('defaultValue')
+
+const ProviderComp = (props) => (
+  <Provider value={'realValue'}>
+    {props.children}
+  </Provider>
+)
+
+const ConsumerComp = () => (
+  <Consumer>
+    {(value) => <p>{value}</p>}
+  </Consumber>
+)
+```
+
+We will discuss the difference between old `context` api and the new ones later in the [context section](/features/context). The old `context` api is notoriously bad at performance.
+
+## forwardRef
+
+`forwardRef` is used to solve the problem when we are passing `ref` from `HOC(Higher Order Component)` to `WrappedComponent`. For example, when we are using `redux`, we use `connect` to bind `state` for the needed/related component. If you dig into it, we are actually wrapping a component outside of a component and passing down the `props` via `...props` to the component inside. You can see a lot of `forwardRef` in UI library too, Ex: [Radix UI](https://github.com/radix-ui/primitives/blob/c31c97274ff357aea99afe6c01c1c8c58b6356e0/packages/react/slot/src/Slot.tsx#L12). 
+
+A simple example of `forwardRef`:
+
+```typescript
+
+const TargetComponent = React.forwardRef((props, ref) => (
+  <TargetComponent ref={ref} />
+))
+
+```typescript
+
+This is why we need to provide a `createRef` as one of the ways to handle `ref` too. Because if you use `string ref` you won't be able to pass it down as props. 
+
+In [later chapter](/features/ref) of this book we will talk more about `ref`. 
+
+
+## Component types
+
+```typescript
+
+Fragment: REACT_FRAGMENT_TYPE,
+StrictMode: REACT_STRICT_MODE_TYPE,
+unstable_AsyncMode: REACT_ASYNC_MODE_TYPE,
+unstable_Profiler: REACT_PROFILER_TYPE,
+
+```
+These four types are base types of components that React provided. They are ummm...similar to placeholder, a symbol-ish thing. When React is rendering, it will check if the component is one of these types, if it is, it will handle them differently. Ex: React will change the `mode` of the children of these components to the same `mode` as them, if React sees `StrictMode` and `AsyncMode`. 
+
+## createElement & cloneElement & createFactory & isValidElement
+
+`createElement` is the core of `React`. It is the function that creates `ReactElement`, but because we are in the land of JSX, and JSX is not standard Javascript, most of us never seen it and probably never uses it. You will only see it after the code is compiled: 
+    
+```typescript
+
+// jsx
+<div id="app">content</div>
+
+// js
+React.createElement('div', { id: 'app' }, 'content')
+
+```
+
+As obvious as its name, `cloneElement` is used to clone `ReactElement`.
+
+And `createFactory` is used to create a factory function that creates `ReactElement` with the same type. 
+
+```typescript
+
+export function createFactory(type) {
+  const factory = createElement.bind(null, type);
+  factory.type = type;
+  return factory;
+}
+
+```
+
+It binds the first attribute of `createElement` to `type` and returns a function. 
+
+When we compile JSX we don't usually see it, same as `isValidElement`. It is used to check if the input is a valid `ReactElement`. 
+
