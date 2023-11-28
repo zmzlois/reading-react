@@ -35,7 +35,7 @@ function mapIntoWithKeyPrefixInternal(children, array, prefix, func, context) {
 }
 ```
 
-The biggest different between `map` and `forEach` is they don't have `return result`. 
+The biggest different between `map` and `forEach` is `forEach` doesn't have `return result`. 
 
 `getPooledTraverseContext` will look for a target in `pool`, and then `releaseTraverseContext` will clean up the current items in `context` and then put it back into `pool`.
 
