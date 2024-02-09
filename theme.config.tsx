@@ -38,13 +38,14 @@ const config: DocsThemeConfig = {
     return (
       <>
         <meta property="og:url" content={url} />
+        <meta name="twitter:site" content="@zmzlois"></meta>
         <meta
           property="og:title"
-          content={frontMatter.title || "React React"}
+          content={frontMatter.title || "Reading React"}
         />
         <meta
           property="og:description"
-          content={frontMatter.description || "Reading React Source Code"}
+          content={frontMatter.title || "Reading React"}
         />
         <meta
           property="og:image"
@@ -52,6 +53,11 @@ const config: DocsThemeConfig = {
             process.env.VERCEL_URL ? "https://" + process.env.VERCEL_URL : ""
           }/api/og-image`}
         />
+        <meta
+          property="og:title"
+          content={frontMatter.title || "Reading React"}
+        ></meta>
+        <meta name="apple-mobile-web-app-title" content="Reading React"></meta>
       </>
     );
   },
