@@ -1,18 +1,60 @@
-import React from 'react'
-import { DocsThemeConfig } from 'nextra-theme-docs'
+import React from "react";
+import { DocsThemeConfig, useConfig } from "nextra-theme-docs";
+import { useRouter } from "next/router";
+import Image from "./pages/api/og-image";
 
 const config: DocsThemeConfig = {
   logo: <b>Reading React</b>,
   project: {
-    link: 'https://github.com/zmzlois/reading-react',
+    link: "https://github.com/zmzlois/reading-react",
   },
   chat: {
-    link: 'https://discord.gg/CPWTVStGZQ',
+    link: "https://discord.gg/CPWTVStGZQ",
   },
-  docsRepositoryBase: 'https://github.com/zmzlois/reading-react',
+  docsRepositoryBase: "https://github.com/zmzlois/reading-react",
   footer: {
-    text: <div>Reading React - zmzlois <br/> <p className="text-xs">Translated from <a href="https://react-book-new.vercel.app/">Analysing React Source Code</a></p></div>,
+    text: (
+      <div>
+        Reading React - zmzlois <br />{" "}
+        <p className="text-xs">
+          Translated from{" "}
+          <a href="https://react-book-new.vercel.app/">
+            Analysing React Source Code
+          </a>
+        </p>
+      </div>
+    ),
   },
-}
+  head: () => {
+    const { asPath, defaultLocale, locale } = useRouter();
+    const { frontMatter } = useConfig();
+    const url =
+      "https://reading-react.vercel.app" +
+      (defaultLocale === locale ? asPath : `/${locale}${asPath}`);
 
-export default config
+    // const image = Image({ title: frontMatter.title || "Reading React" }).then(
+    //   (res) => res.url
+    // );
+    return (
+      <>
+        <meta property="og:url" content={url} />
+        <meta
+          property="og:title"
+          content={frontMatter.title || "React React"}
+        />
+        <meta
+          property="og:description"
+          content={frontMatter.description || "Reading React Source Code"}
+        />
+        <meta
+          property="og:image"
+          content={`${
+            process.env.VERCEL_URL ? "https://" + process.env.VERCEL_URL : ""
+          }/api/og-image`}
+        />
+      </>
+    );
+  },
+};
+
+export default config;

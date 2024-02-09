@@ -18,6 +18,7 @@
   },
   "homepage": "https://github.com/zmzlois/reading-react#readme",
   "dependencies": {
+    "@vercel/og": "^0.6.2",
     "mermaid": "^10.6.1",
     "next": "^13.0.6",
     "nextra": "latest",
