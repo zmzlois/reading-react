@@ -3,7 +3,7 @@ import { NextRequest } from "next/server";
 
 // Route segment config
 export const config = {
-  runtime: "experimental-edge",
+  runtime: "edge",
 };
 
 // Image metadata
