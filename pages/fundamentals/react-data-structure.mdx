@@ -1,12 +1,10 @@
+import Grid from "../../components/grid"
+
 # Data Structure in React
+In this part we will go through the data structure in React, including `FiberRoot`, `Fiber`, `effectTags`, `ReactWorkTag`, `sideEffects`, `Update` and `UpdateQueue` and compare both the latest version and the version on v16.
 
 ## FiberRoot
-In the latest version of React when I am translating this, there are some changes. To see the version on v16, it's <a className="underline decoration text-blue-400" href="#V16">here</a> ⬅️
 
-Changes are related to: 
-- adding `tag` to specify the type of root 
-- Improve performance: separate suspended time are removed and handled better by `Lane`, `expirationTimes` and `callbackPriority`
-- Better error handling: remove `didError` as boolean, and make them `onRecoverable Error` with specific error information
 
 ### V18
 ```typescript
@@ -146,3 +144,591 @@ type BaseFiberRootProperties = {|
   nextScheduledRoot: FiberRoot | null,
 |};
 ```
+
+#### Changes 
+- adding `tag` to specify the type of root 
+- Improve performance: separate suspended time are removed and handled better by `Lane`, `expirationTimes` and `callbackPriority`
+- Better error handling: remove `didError` as boolean, and make them `onRecoverable Error` with specific error information
+
+Reference: [ReactInternalTypes.ts](https://github.com/facebook/react/blob/ba5e6a8329c7194a2c573c037a37f24ce45ee58f/packages/react-reconciler/src/ReactInternalTypes.js#L210)
+
+
+
+## Fiber 
+
+As seen in reference of [ReactInternalTypes.ts](https://github.com/facebook/react/blob/ba5e6a8329c7194a2c573c037a37f24ce45ee58f/packages/react-reconciler/src/ReactInternalTypes.js#L80)
+
+
+### V18 
+```typescript
+// A Fiber is work on a Component that needs to be done or was done. There can
+// be more than one per component.
+export type Fiber = {
+  // These first fields are conceptually members of an Instance. This used to
+  // be split into a separate type and intersected with the other Fiber fields,
+  // but until Flow fixes its intersection bugs, we've merged them into a
+  // single type.
+
+  // An Instance is shared between all versions of a component. We can easily
+  // break this out into a separate object to avoid copying so much to the
+  // alternate versions of the tree. We put this on a single object for now to
+  // minimize the number of objects created during the initial render.
+
+  // Tag identifying the type of fiber.
+  tag: WorkTag,
+
+  // Unique identifier of this child.
+  key: null | string,
+
+  // The value of element.type which is used to preserve the identity during
+  // reconciliation of this child.
+  elementType: any,
+
+  // The resolved function/class/ associated with this fiber.
+  type: any,
+
+  // The local state associated with this fiber.
+  stateNode: any,
+
+  // Conceptual aliases
+  // parent : Instance -> return The parent happens to be the same as the
+  // return fiber since we've merged the fiber and instance.
+
+  // Remaining fields belong to Fiber
+
+  // The Fiber to return to after finishing processing this one.
+  // This is effectively the parent, but there can be multiple parents (two)
+  // so this is only the parent of the thing we're currently processing.
+  // It is conceptually the same as the return address of a stack frame.
+  return: Fiber | null,
+
+  // Singly Linked List Tree Structure.
+  child: Fiber | null,
+  sibling: Fiber | null,
+  index: number,
+
+  // The ref last used to attach this node.
+  // I'll avoid adding an owner field for prod and model that as functions.
+  ref:
+    | null
+    | (((handle: mixed) => void) & {_stringRef: ?string, ...})
+    | RefObject,
+
+  refCleanup: null | (() => void),
+
+  // Input is the data coming into process this fiber. Arguments. Props.
+  pendingProps: any, // This type will be more specific once we overload the tag.
+  memoizedProps: any, // The props used to create the output.
+
+  // A queue of state updates and callbacks.
+  updateQueue: mixed,
+
+  // The state used to create the output
+  memoizedState: any,
+
+  // Dependencies (contexts, events) for this fiber, if it has any
+  dependencies: Dependencies | null,
+
+  // Bitfield that describes properties about the fiber and its subtree. E.g.
+  // the ConcurrentMode flag indicates whether the subtree should be async-by-
+  // default. When a fiber is created, it inherits the mode of its
+  // parent. Additional flags can be set at creation time, but after that the
+  // value should remain unchanged throughout the fiber's lifetime, particularly
+  // before its child fibers are created.
+  mode: TypeOfMode,
+
+  // Effect
+  flags: Flags,
+  subtreeFlags: Flags,
+  deletions: Array<Fiber> | null,
+
+  // Singly linked list fast path to the next fiber with side-effects.
+  nextEffect: Fiber | null,
+
+  // The first and last fiber with side-effect within this subtree. This allows
+  // us to reuse a slice of the linked list when we reuse the work done within
+  // this fiber.
+  firstEffect: Fiber | null,
+  lastEffect: Fiber | null,
+
+  lanes: Lanes,
+  childLanes: Lanes,
+
+  // This is a pooled version of a Fiber. Every fiber that gets updated will
+  // eventually have a pair. There are cases when we can clean up pairs to save
+  // memory if we need to.
+  alternate: Fiber | null,
+
+  // Time spent rendering this Fiber and its descendants for the current update.
+  // This tells us how well the tree makes use of sCU for memoization.
+  // It is reset to 0 each time we render and only updated when we don't bailout.
+  // This field is only set when the enableProfilerTimer flag is enabled.
+  actualDuration?: number,
+
+  // If the Fiber is currently active in the "render" phase,
+  // This marks the time at which the work began.
+  // This field is only set when the enableProfilerTimer flag is enabled.
+  actualStartTime?: number,
+
+  // Duration of the most recent render time for this Fiber.
+  // This value is not updated when we bailout for memoization purposes.
+  // This field is only set when the enableProfilerTimer flag is enabled.
+  selfBaseDuration?: number,
+
+  // Sum of base times for all descendants of this Fiber.
+  // This value bubbles up during the "complete" phase.
+  // This field is only set when the enableProfilerTimer flag is enabled.
+  treeBaseDuration?: number,
+
+  // Conceptual aliases
+  // workInProgress : Fiber ->  alternate The alternate used for reuse happens
+  // to be the same as work in progress.
+  // __DEV__ only
+
+  _debugOwner?: Fiber | null,
+  _debugIsCurrentlyTiming?: boolean,
+  _debugNeedsRemount?: boolean,
+
+  // Used to verify that the order of hooks does not change between renders.
+  _debugHookTypes?: Array<HookType> | null,
+};
+
+
+```
+
+### V16 
+```typescript
+type Fiber = {|
+  // Tag identifying the type of fiber.
+  tag: WorkTag,
+
+  // Unique identifier of this child.
+  key: null | string,
+
+  // The value of element.type which is used to preserve the identity during
+  // reconciliation of this child.
+  elementType: any,
+
+  // The resolved function/class/ associated  with this fiber. These are usually functions or classes, but type is kept generic to avoid recasting for flow.
+  type: any,
+
+  // The local state associated with this fiber.
+  stateNode: any,
+
+  // Pointing towards the `parent` fiber, which is the same as the `return` fiber since we've merged the fiber and instance.
+  return: Fiber | null,
+
+  // Singly Linked List Tree Structure.
+  child: Fiber | null,
+  sibling: Fiber | null,
+  index: number,
+
+  // The attribute of the ref last used to attach this node.
+  ref:
+    | null
+    | (((handle: mixed) => void) & {_stringRef: ?string, ...})
+    | RefObject,
+  
+  // new props brought up by changes
+  pendingProps: any, // This type will be more specific once we overload the tag.
+  memoizedProps: any, // The props from the last render.
+
+  // Updates of components in this fiber will be stored in this queue 
+  updateQueue: UpdateQueue<any> | null,
+
+  // The state from last render 
+  memoizedState: any,
+
+  // A list to store the depending context of this Fiber
+  firstContextDependency: ContextDependency<mixed> | null,
+
+  // Used to describe current Fiber and the children's `Bitfield`. The shared mode means the childrens are not rendered separately, When the Fiber is created, it will inherit the mode of its parent. Additional flags can be set at creation time, but after that the value should remain unchanged throughout the fiber's lifetime, particularly before its child fibers are created.
+  mode: TypeOfMode,
+
+  // Effect
+  // Used to describe Side Effects of the Fiber
+  effectTags: SideEffectTag,
+
+  // Single linked list is used to search for the next side effect 
+  nextEffect: Fiber | null,
+
+  // The first side effect in the children's tree 
+  firstEffect: Fiber | null,
+  // The last side effect in the children's tree
+  lastEffect: Fiber | null,
+
+  // Represents the expirationTime of the Fiber render, but doesn't include its children's expirationTime
+  expirationTime: ExpirationTime,
+  
+  // To confirm whether there is pending changes in the children's tree
+  childExpirationTime: ExpirationTime,
+
+  // When the Fiber tree is pending for an update, each Fiber will have a corresponding Fiber 
+  // We call them `current` <==> `workInProgress` and they will swap position after rendering 
+  alternate: Fiber | null, 
+
+  // Below content are used for configuration/collection of each Fiber and their children's render time, also used for debugging
+
+  actualDuration?: number,
+// If the Fiber is currently active in the "render" phase,
+  // This marks the time at which the work began.
+  // This field is only set when the enableProfilerTimer flag is enabled.
+  actualStartTime?: number,
+
+  // Duration of the most recent render time for this Fiber.
+  // This value is not updated when we bailout for memoization purposes.
+  // This field is only set when the enableProfilerTimer flag is enabled.
+  selfBaseDuration?: number,
+
+  // Sum of base times for all descedents of this Fiber.
+  // This value bubbles up during the "complete" phase.
+  // This field is only set when the enableProfilerTimer flag is enabled.
+  treeBaseDuration?: number,
+
+  // Conceptual aliases
+  // workInProgress : Fiber ->  alternate The alternate used for reuse happens
+  // to be the same as work in progress.
+  // __DEV__ only
+  _debugID?: number,
+  _debugSource?: Source | null,
+  _debugOwner?: Fiber | null,
+  _debugIsCurrentlyTiming?: boolean,
+|};
+```
+
+#### Changes
+
+##### Clean up
+1. Specifically cleaning up after `ref`. If clean up function is not provided, `ref` function [is called with null](https://github.com/facebook/react/commit/e98225485a124e35abc4cea82e6da944472ce7c7) like it has been before. 
+2. [Remove `_debugID`](https://github.com/facebook/react/commit/0d493dcda96fc86242cf9a05a44130978a56fbdd) and `_debugSource` fields as they are not really needed and adds costs but adds `_debugHookTypes` for hooks and a boolean `_debugNeedsRemount` for quick debug status confirmation.
+
+##### Clearer naming and separations 
+1. `firstContextDependency` is now `dependencies` 
+2. `effectTags` is now separated into `flags`, `subtreeFlags` and `deletions`. See [Effects list refactor](https://github.com/facebook/react/commit/a226b9b44591e2af85388fa88ddf76b3f3a9de6c#diff-d1a3ea99997381524bfbed5c008aa456ee10f8e773d027d94acb1a37f416e872) and [combine flags and subtreeFlags](https://github.com/facebook/react/commit/7baf9d4128d41903de125527b50285ea9862cf9a) whilst the effect algorithm is unchanged. 
+3. `expirationTime` is now `lanes` and `childExpirationTime` is now `childLanes`. Consequently Andrew simplifies them by [splitting the types](https://github.com/facebook/react/commit/376d5c1b5aa17724c5fea9412f8fcde14a7b23f1) and then [make expirationTime an opaque type](https://github.com/facebook/react/commit/db6513914f99c260090f26f0a547ee1432c934e6) in order to replace previous scheduler work in reconciler, as a more apparent way of how tasks are being queued.
+
+
+
+## effectTags -> FiberFlags
+
+
+
+### V18 
+```typescript
+/**
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ *
+ * @flow
+ */
+
+import {enableCreateEventHandleAPI} from 'shared/ReactFeatureFlags';
+
+export type Flags = number;
+
+// Don't change these values. They're used by React Dev Tools.
+export const NoFlags = /*                      */ 0b0000000000000000000000000000;
+export const PerformedWork = /*                */ 0b0000000000000000000000000001;
+export const Placement = /*                    */ 0b0000000000000000000000000010;
+export const DidCapture = /*                   */ 0b0000000000000000000010000000;
+export const Hydrating = /*                    */ 0b0000000000000001000000000000;
+
+// You can change the rest (and add more).
+export const Update = /*                       */ 0b0000000000000000000000000100;
+/* Skipped value:                                 0b0000000000000000000000001000; */
+
+export const ChildDeletion = /*                */ 0b0000000000000000000000010000;
+export const ContentReset = /*                 */ 0b0000000000000000000000100000;
+export const Callback = /*                     */ 0b0000000000000000000001000000;
+/* Used by DidCapture:                            0b0000000000000000000010000000; */
+
+export const ForceClientRender = /*            */ 0b0000000000000000000100000000;
+export const Ref = /*                          */ 0b0000000000000000001000000000;
+export const Snapshot = /*                     */ 0b0000000000000000010000000000;
+export const Passive = /*                      */ 0b0000000000000000100000000000;
+/* Used by Hydrating:                             0b0000000000000001000000000000; */
+
+export const Visibility = /*                   */ 0b0000000000000010000000000000;
+export const StoreConsistency = /*             */ 0b0000000000000100000000000000;
+
+// It's OK to reuse these bits because these flags are mutually exclusive for
+// different fiber types. We should really be doing this for as many flags as
+// possible, because we're about to run out of bits.
+export const ScheduleRetry = StoreConsistency;
+export const ShouldSuspendCommit = Visibility;
+export const DidDefer = ContentReset;
+
+export const LifecycleEffectMask =
+  Passive | Update | Callback | Ref | Snapshot | StoreConsistency;
+
+// Union of all commit flags (flags with the lifetime of a particular commit)
+export const HostEffectMask = /*               */ 0b0000000000000111111111111111;
+
+// These are not really side effects, but we still reuse this field.
+export const Incomplete = /*                   */ 0b0000000000001000000000000000;
+export const ShouldCapture = /*                */ 0b0000000000010000000000000000;
+export const ForceUpdateForLegacySuspense = /* */ 0b0000000000100000000000000000;
+export const DidPropagateContext = /*          */ 0b0000000001000000000000000000;
+export const NeedsPropagation = /*             */ 0b0000000010000000000000000000;
+export const Forked = /*                       */ 0b0000000100000000000000000000;
+
+// Static tags describe aspects of a fiber that are not specific to a render,
+// e.g. a fiber uses a passive effect (even if there are no updates on this particular render).
+// This enables us to defer more work in the unmount case,
+// since we can defer traversing the tree during layout to look for Passive effects,
+// and instead rely on the static flag as a signal that there may be cleanup work.
+export const RefStatic = /*                    */ 0b0000001000000000000000000000;
+export const LayoutStatic = /*                 */ 0b0000010000000000000000000000;
+export const PassiveStatic = /*                */ 0b0000100000000000000000000000;
+export const MaySuspendCommit = /*             */ 0b0001000000000000000000000000;
+
+// Flag used to identify newly inserted fibers. It isn't reset after commit unlike `Placement`.
+export const PlacementDEV = /*                 */ 0b0010000000000000000000000000;
+export const MountLayoutDev = /*               */ 0b0100000000000000000000000000;
+export const MountPassiveDev = /*              */ 0b1000000000000000000000000000;
+
+// Groups of flags that are used in the commit phase to skip over trees that
+// don't contain effects, by checking subtreeFlags.
+
+export const BeforeMutationMask: number =
+  // TODO: Remove Update flag from before mutation phase by re-landing Visibility
+  // flag logic (see #20043)
+  Update |
+  Snapshot |
+  (enableCreateEventHandleAPI
+    ? // createEventHandle needs to visit deleted and hidden trees to
+      // fire beforeblur
+      // TODO: Only need to visit Deletions during BeforeMutation phase if an
+      // element is focused.
+      ChildDeletion | Visibility
+    : 0);
+
+export const MutationMask =
+  Placement |
+  Update |
+  ChildDeletion |
+  ContentReset |
+  Ref |
+  Hydrating |
+  Visibility;
+export const LayoutMask = Update | Callback | Ref | Visibility;
+
+// TODO: Split into PassiveMountMask and PassiveUnmountMask
+export const PassiveMask = Passive | Visibility | ChildDeletion;
+
+// Union of tags that don't get reset on clones.
+// This allows certain concepts to persist without recalculating them,
+// e.g. whether a subtree contains passive effects or portals.
+export const StaticMask =
+  LayoutStatic | PassiveStatic | RefStatic | MaySuspendCommit;
+
+```
+
+### V16
+```typescript
+/**
+ * Copyright (c) Facebook, Inc. and its affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ *
+ * @flow
+ */
+
+export type SideEffectTag = number;
+
+// Don't change these two values. They're used by React Dev Tools.
+export const NoEffect = /*              */ 0b00000000000;
+export const PerformedWork = /*         */ 0b00000000001;
+
+// You can change the rest (and add more).
+export const Placement = /*             */ 0b00000000010;
+export const Update = /*                */ 0b00000000100;
+export const PlacementAndUpdate = /*    */ 0b00000000110;
+export const Deletion = /*              */ 0b00000001000;
+export const ContentReset = /*          */ 0b00000010000;
+export const Callback = /*              */ 0b00000100000;
+export const DidCapture = /*            */ 0b00001000000;
+export const Ref = /*                   */ 0b00010000000;
+export const Snapshot = /*              */ 0b00100000000;
+
+// Update & Callback & Ref & Snapshot
+export const LifecycleEffectMask = /*   */ 0b00110100100;
+
+// Union of all host effects
+export const HostEffectMask = /*        */ 0b00111111111;
+
+export const Incomplete = /*            */ 0b01000000000;
+export const ShouldCapture = /*         */ 0b10000000000;
+```
+
+#### Changes
+[V18](https://github.com/facebook/react/blob/main/packages/react-reconciler/src/ReactFiberFlags.js) renamed `ReactSideEffectTags` to `ReactFiberFlags` (ReactFiberFlags) to broaden fiber types. The contants in the old [ReactSideEffectTags](https://github.com/facebook/react/blob/5d9f5e5941587e0c72ecfb7b76f1849a95e93f8a/packages/shared/ReactSideEffectTags.js) used bitwise operations to efficiently track and manage the effects of updates to the virtual DOM + prevent app crashing/bailout. `effectTags` and `sideEffects` are consolidated into one file `FiberFlags`.
+
+
+And yes, running out of bits in React is a real fucking risk. 
+
+## ReactWorkTag
+
+
+### V18 
+```typescript
+export const FunctionComponent = 0;
+export const ClassComponent = 1;
+export const IndeterminateComponent = 2; // Before we know whether it is function or class
+export const HostRoot = 3; // Root of a host tree. Could be nested inside another node.
+export const HostPortal = 4; // A subtree. Could be an entry point to a different renderer.
+export const HostComponent = 5;
+export const HostText = 6;
+export const Fragment = 7;
+export const Mode = 8;
+export const ContextConsumer = 9;
+export const ContextProvider = 10;
+export const ForwardRef = 11;
+export const Profiler = 12;
+export const SuspenseComponent = 13;
+export const MemoComponent = 14;
+export const SimpleMemoComponent = 15;
+export const LazyComponent = 16;
+export const IncompleteClassComponent = 17;
+export const DehydratedFragment = 18;
+export const SuspenseListComponent = 19;
+export const ScopeComponent = 21;
+export const OffscreenComponent = 22;
+export const LegacyHiddenComponent = 23;
+export const CacheComponent = 24;
+export const TracingMarkerComponent = 25;
+export const HostHoistable = 26;
+export const HostSingleton = 27;
+```
+
+
+### V16 
+```typescript
+
+export const FunctionComponent = 0;
+export const ClassComponent = 1;
+export const IndeterminateComponent = 2; // Before we know whether it is function or class
+export const HostRoot = 3; // Root of a host tree. Could be nested inside another node.
+export const HostPortal = 4; // A subtree. Could be an entry point to a different renderer.
+export const HostComponent = 5;
+export const HostText = 6;
+export const Fragment = 7;
+export const Mode = 8;
+export const ContextConsumer = 9;
+export const ContextProvider = 10;
+export const ForwardRef = 11;
+export const Profiler = 12;
+export const SuspenseComponent = 13;
+export const MemoComponent = 14;
+export const SimpleMemoComponent = 15;
+export const LazyComponent = 16;
+export const IncompleteClassComponent = 17;
+```
+
+#### Changes  
+The new version added `DehydratedFragment`, `SuspenseListComponent`, `ScopeComponent`, `OffscreenComponent`, `LegacyHiddenComponent`, `CacheComponent`, `TracingMarkerComponent`, `HostHoistable`, `HostSingleton` to the list of `ReactWorkTag`. We will talk about some of them (ex: `SuspenseListComponent`) in the later section. 
+
+
+## Update & UpdateQueue 
+
+
+### V18 
+
+
+```typescript
+export type Update<State> = {
+  lane: Lane,
+
+  tag: 0 | 1 | 2 | 3,
+  payload: any,
+  callback: (() => mixed) | null,
+
+  next: Update<State> | null,
+};
+
+export type SharedQueue<State> = {
+  pending: Update<State> | null,
+  lanes: Lanes,
+  hiddenCallbacks: Array<() => mixed> | null,
+};
+
+export type UpdateQueue<State> = {
+  baseState: State,
+  firstBaseUpdate: Update<State> | null,
+  lastBaseUpdate: Update<State> | null,
+  shared: SharedQueue<State>,
+  callbacks: Array<() => mixed> | null,
+};
+
+export const UpdateState = 0;
+export const ReplaceState = 1;
+export const ForceUpdate = 2;
+export const CaptureUpdate = 3;
+
+```
+
+### V16 
+```typescript
+export type Update<State> = {
+  // The updated expiration time
+  expirationTime: ExpirationTime,
+
+  // export const UpdateState = 0;
+  // export const ReplaceState = 1;
+  // export const ForceUpdate = 2;
+  // export const CaptureUpdate = 3;
+  // Four states of updates with their own tag numbers
+  tag: 0 | 1 | 2 | 3,
+
+  // Updated content. ex: the first argument of `setState`
+
+  payload: any,
+
+  // Callback function. ex: the second argument of `setState`
+
+  callback: (() => mixed) | null,
+
+  // The next update in the queue
+
+  next: Update<State> | null,
+
+  // The priority level of the update, next `side effect`
+  nextEffect: Update<State> | null,
+};
+
+export type UpdateQueue<State> = {
+
+  // The state after each update
+  baseState: State,
+
+  // The first update in the queue
+  firstUpdate: Update<State> | null,
+
+  // The last update in the queue
+  lastUpdate: Update<State> | null,
+
+  // The first captured update in the queue
+  firstCapturedUpdate: Update<State> | null,
+
+  // The last captured update in the queue
+  lastCapturedUpdate: Update<State> | null,
+
+  // The first `side effect`
+  firstEffect: Update<State> | null,
+
+  // The last `side effect`
+  lastEffect: Update<State> | null,
+
+  // The first captured `side effect` and the last
+  firstCapturedEffect: Update<State> | null,
+  lastCapturedEffect: Update<State> | null,
+};
+```
+
+#### Changes
+1. Both `Update` and `UpdateQueue` are simplified in `V18`. Added `SharedQueue`.
+2. `expirationTime` is removed from `Update` and replaced by `lane` in `V18` according to the new `Lane` expression. 
+3. Removed all redundant UpdateStates and consolidated them into `lane`/`pending`.
