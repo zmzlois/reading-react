@@ -1,1 +1,148 @@
 # Data Structure in React
+
+## FiberRoot
+In the latest version of React when I am translating this, there are some changes. To see the version on v16, it's <a className="underline decoration text-blue-400" href="#V16">here</a> ⬅️
+
+Changes are related to: 
+- adding `tag` to specify the type of root 
+- Improve performance: separate suspended time are removed and handled better by `Lane`, `expirationTimes` and `callbackPriority`
+- Better error handling: remove `didError` as boolean, and make them `onRecoverable Error` with specific error information
+
+### V18
+```typescript
+type BaseFiberRootProperties = {
+  // The type of root (legacy, batched, concurrent, etc.)
+  tag: RootTag,
+
+  // Any additional information from the host associated with this root.
+  containerInfo: Container,
+  // Used only by persistent updates.
+  pendingChildren: any,
+  // The currently active root fiber. This is the mutable root of the tree.
+  current: Fiber,
+
+  pingCache: WeakMap<Wakeable, Set<mixed>> | Map<Wakeable, Set<mixed>> | null,
+
+  // A finished work-in-progress HostRoot that's ready to be committed.
+  finishedWork: Fiber | null,
+  // Timeout handle returned by setTimeout. Used to cancel a pending timeout, if
+  // it's superseded by a new one.
+  timeoutHandle: TimeoutHandle | NoTimeout,
+  // When a root has a pending commit scheduled, calling this function will
+  // cancel it.
+  // TODO: Can this be consolidated with timeoutHandle?
+  cancelPendingCommit: null | (() => void),
+  // Top context object, used by renderSubtreeIntoContainer
+  context: Object | null,
+  pendingContext: Object | null,
+
+  // Used to create a linked list that represent all the roots that have
+  // pending work scheduled on them.
+  next: FiberRoot | null,
+
+  // Node returned by Scheduler.scheduleCallback. Represents the next rendering
+  // task that the root will work on.
+  callbackNode: any,
+  callbackPriority: Lane,
+  expirationTimes: LaneMap<number>,
+  hiddenUpdates: LaneMap<Array<ConcurrentUpdate> | null>,
+
+  pendingLanes: Lanes,
+  suspendedLanes: Lanes,
+  pingedLanes: Lanes,
+  expiredLanes: Lanes,
+  errorRecoveryDisabledLanes: Lanes,
+  shellSuspendCounter: number,
+
+  finishedLanes: Lanes,
+
+  entangledLanes: Lanes,
+  entanglements: LaneMap<Lanes>,
+
+  pooledCache: Cache | null,
+  pooledCacheLanes: Lanes,
+
+  // TODO: In Fizz, id generation is specific to each server config. Maybe we
+  // should do this in Fiber, too? Deferring this decision for now because
+  // there's no other place to store the prefix except for an internal field on
+  // the public createRoot object, which the fiber tree does not currently have
+  // a reference to.
+  identifierPrefix: string,
+
+  onRecoverableError: (
+    error: mixed,
+    errorInfo: {digest?: ?string, componentStack?: ?string},
+  ) => void,
+
+  formState: ReactFormState<any, any> | null,
+};
+
+```
+### V16 
+```typescript
+type BaseFiberRootProperties = {|
+  // it's a node in root, second argument of render
+  containerInfo: any,
+  // only being used in persisted updates( aka doesn't support incremental updates), neither used in react-dom
+  pendingChildren: any,
+  // current target fiber, the root of the tree
+  current: Fiber,
+
+  // Below code are used for separating priorities of tasks 
+  // 1) Task that are not commited
+  // 2) Suspence that are not committed
+  // 3) Suspence that might be committed later
+  // To improve performance, it chose to not trace every single blocking registration 
+  // The earliest and latest priority levels that are suspended from committing.
+  // The earlist and latest tasks that are await for rendering
+
+  earliestSuspendedTime: ExpirationTime,
+  latestSuspendedTime: ExpirationTime,
+
+  // The earliest and latest priority levels that are not known to be suspended.
+  // The earliest and latest tasks that are pending/unsure of the render（The initial state of all the tasks when they come in）
+  earliestPendingTime: ExpirationTime,
+  latestPendingTime: ExpirationTime,
+
+  // The latest priority level that was pinged by a resolved promise and can
+  // be retried.
+  // The least priority that can be resolved via a promise
+  latestPingedTime: ExpirationTime,
+
+  // If there are error being thrown, and there are no further updates, it will try to rendering from the start before handling the error 
+  // if there are errors that can't be handled at `renderRoot`, this `didError` will be marked as `true` 
+  didError: boolean,
+
+  // `expirationTime` of the task that are await to be committed 
+  pendingCommitExpirationTime: ExpirationTime,
+
+  //  The FiberRoot target that already finished rendering, if you only have one root, then it will always be the fiber in this Root, or it is null 
+  // During commit phase, React will only handle the task related to `finishedWord`
+  finishedWork: Fiber | null,
+
+  // The returned result when the tasks are being handled by `setTimeout`, when there is a next new task it will trigger the timeout yet to be cleaned up
+  timeoutHandle: TimeoutHandle | NoTimeout,
+
+  // Top level context, it will only be used when `renderSubtreeIntoContainer` 
+  context: Object | null,
+  pendingContext: Object | null,
+
+  // Used to make sure if the first render needs hydration
+  +hydrate: boolean,
+
+  // The rest of expirationTime in current root
+  // TODO: explain how the renderer separate the target to handle
+  nextExpirationTimeToWorkOn: ExpirationTime,
+  
+  // The current expirationTime's expirationTime
+  expirationTime: ExpirationTime,
+
+  // List of top-level batches. This list indicates whether a commit should be
+  // deferred. Also contains completion callbacks.
+  // TODO: Lift this into the renderer
+  firstBatch: Batch | null,
+
+  // How the Roots are related -> to handle the next root
+  nextScheduledRoot: FiberRoot | null,
+|};
+```

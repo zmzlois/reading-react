@@ -143,9 +143,9 @@ function traverseAllChildrenImpl(
     } else {
         const iteratorFn = getIteratorFn(children);
         if (typeof iteratorFn === "function") {
-            // iterator，和array差不多
+            // iterator，similar to array
         } else if (type === "object") {
-            // 提醒不正确的children类型
+            // checking if the children's type is not correct
         }
     }
 
